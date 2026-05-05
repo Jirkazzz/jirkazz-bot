@@ -1,0 +1,13 @@
+{
+    "name": "jirkazz-kick-bot",
+    "version": "1.0.0",
+    "main": "kick_bot.js",
+    "scripts": {
+          "start": "node kick_bot.js"
+    },
+    "dependencies": {
+          "@neondatabase/serverless": "^0.10.4",
+          "dotenv": "^16.0.3",
+          "pusher-js": "^8.4.0"
+    }
+}
