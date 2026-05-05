@@ -1,22 +1,21 @@
 name: Jirkazz Kick Bot
 on:
-  schedule:
-      - cron: '0 */5 * * *'
-        workflow_dispatch:
-        jobs:
-          kick-bot:
-              runs-on: ubuntu-latest
-                  timeout-minutes: 290
-                      steps:
-                            - uses: actions/checkout@v4
-                                  - uses: actions/setup-node@v4
-                                          with:
-                                                    node-version: '20'
-                                                          - run: npm install
-                                                                - run: node kick_bot.js
-                                                                        env:
-                                                                                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
-                                                                                            KICK_BEARER_TOKEN: ${{ secrets.KICK_BEARER_TOKEN }}
-                                                                                                      KICK_CSRF_TOKEN: ${{ secrets.KICK_CSRF_TOKEN }}
-                                                                                                                KICK_COOKIES: ${{ secrets.KICK_COOKIES }}
-                                                                                                                
+schedule:
+- cron: '0 */5 * * *'
+workflow_dispatch:
+jobs:
+kick-bot:
+runs-on: ubuntu-latest
+timeout-minutes: 290
+steps:
+- uses: actions/checkout@v4
+- uses: actions/setup-node@v4
+with:
+node-version: '20'
+- run: npm install
+- run: node kick_bot.js
+env:
+DATABASE_URL: ${{ secrets.DATABASE_URL }}
+KICK_BEARER_TOKEN: ${{ secrets.KICK_BEARER_TOKEN }}
+KICK_CSRF_TOKEN: ${{ secrets.KICK_CSRF_TOKEN }}
+KICK_COOKIES: ${{ secrets.KICK_COOKIES }}
