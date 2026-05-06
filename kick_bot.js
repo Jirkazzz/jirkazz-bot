@@ -112,9 +112,41 @@ channel.bind('App\\Events\\ChatMessageEvent', async (data) => {
     }
 });
 
+// --- Zjištění, zda je stream zapnutý ---
+async function isStreamOnline() {
+    try {
+        const res = await fetch(`https://kick.com/api/v1/channels/jirkazz`, {
+            headers: {
+                'accept': 'application/json',
+                'authorization': `Bearer ${BEARER}`,
+                'x-csrf-token': CSRF,
+                'cookie': COOKIES,
+                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        return data.livestream !== null;
+    } catch (err) {
+        console.error("❌ Chyba při kontrole streamu:", err);
+        return false;
+    }
+}
+
 // --- Každých 5 minut: přičteme body aktivním divákům ---
 setInterval(async () => {
     try {
+        const online = await isStreamOnline();
+        if (!online) {
+            console.log("📺 " + new Date().toLocaleTimeString() + " - Stream je OFFLINE. Body se nerozdávají.");
+            // I když je offline, mažeme staré neaktivní uživatele
+            const now = Date.now();
+            for (const [kickId, data] of activeUsers.entries()) {
+                if (now - data.lastSeen > 6 * 60 * 1000) activeUsers.delete(kickId);
+            }
+            return;
+        }
+
         const now = Date.now();
         const eligible = [];
 
