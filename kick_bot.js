@@ -1,4 +1,5 @@
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/../.env.local' });
+require('dotenv').config({ path: __dirname + '/../.env' }); // Fallback
 const { Pusher } = require('pusher-js');
 const { neon } = require('@neondatabase/serverless');
 const WebSocket = require('ws');
@@ -16,7 +17,7 @@ if (!process.env.DATABASE_URL) {
 const sql = neon(process.env.DATABASE_URL);
 
 // Kick nastavení
-const PUSHER_KEY = 'eb1d5f283081a78b932c';
+const PUSHER_KEY = '32cbd69e4b950bf97679';
 const PUSHER_CLUSTER = 'us2';
 const CHATROOM_ID = 21467043; // jirkazz
 
@@ -161,4 +162,3 @@ http.createServer((req, res) => {
 }).listen(PORT, () => {
     console.log(`🌐 Falešný webserver běží na portu ${PORT} (pro Render health check)`);
 });
-
