@@ -152,3 +152,13 @@ setInterval(() => {
     console.log(`💓 Status: Běží | Aktivní v mapě: ${activeUsers.size}`);
 }, 60 * 1000);
 
+// --- Dummy HTTP Server pro Render.com (aby věděl, že bot běží) ---
+const http = require('http');
+const PORT = process.env.PORT || 10000;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Kick bot bezi a nasloucha na portu ' + PORT);
+}).listen(PORT, () => {
+    console.log(`🌐 Falešný webserver běží na portu ${PORT} (pro Render health check)`);
+});
+
