@@ -2,7 +2,7 @@ name: Jirkazz Kick Bot
 
 on:
   schedule:
-    - cron: '0 */5 * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
