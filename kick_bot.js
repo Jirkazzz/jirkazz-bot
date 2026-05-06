@@ -4,193 +4,195 @@ const { Pusher } = require('pusher-js');
 const { neon } = require('@neondatabase/serverless');
 const WebSocket = require('ws');
 
-// Nutné pro běh Pusheru v Node.js
+// Nutne pro beh Pusheru v Node.js
 global.WebSocket = WebSocket;
 
-// Kontrola kritických proměnných hned na startu
+// Kontrola kritickych promennych hned na startu
 if (!process.env.DATABASE_URL) {
-    console.error("❌ CHYBA: DATABASE_URL není nastavena v prostředí!");
-    process.exit(1);
+        console.error("CHYBA: DATABASE_URL neni nastavena v prostredi!");
+        process.exit(1);
 }
 
-// Připojení k databázi
+// Pripojeni k databazi
 const sql = neon(process.env.DATABASE_URL);
 
-// Kick nastavení
+// Kick nastaveni
 const PUSHER_KEY = '32cbd69e4b950bf97679';
 const PUSHER_CLUSTER = 'us2';
 const CHATROOM_ID = 21467043; // jirkazz
 
-// Tokeny pro odesílání zpráv (volitelné pro čtení, povinné pro psaní)
+// Tokeny pro odesilani zprav (volitelne pro cteni, povinne pro psani)
 const BEARER = process.env.KICK_BEARER_TOKEN;
 const CSRF   = process.env.KICK_CSRF_TOKEN;
 const COOKIES = process.env.KICK_COOKIES;
 
 console.log("----------------------------------------");
-console.log("🤖 Jirkazz Kick Bot se spouští...");
-console.log("DATABASE_URL:", "✅ Nastavena");
-console.log("KICK_TOKENS:", BEARER && CSRF && COOKIES ? "✅ OK (Bot může psát)" : "⚠️ CHYBÍ (Bot bude jen číst)");
+console.log("Jirkazz Kick Bot se spousti...");
+console.log("DATABASE_URL:", "Nastavena");
+console.log("KICK_TOKENS:", BEARER && CSRF && COOKIES ? "OK (Bot muze psat)" : "CHYBI (Bot bude jen cist)");
 console.log("----------------------------------------");
 
-// Sledování aktivity: kickId -> { username, lastSeen }
+// Sledovani aktivity: kickId -> { username, lastSeen }
 const activeUsers = new Map();
 
-// --- Funkce pro odesílání zprávy do Kick chatu jako Jirkazz ---
+// --- Funkce pro odesilani zpravy do Kick chatu jako Jirkazz ---
 async function sendKickMessage(message) {
-    if (!BEARER || !CSRF || !COOKIES) {
-        console.log("⚠️ Zpráva nebyla odeslána (chybí tokeny):", message);
-        return;
-    }
-    try {
-        const res = await fetch(`https://kick.com/api/v2/messages/send/${CHATROOM_ID}`, {
-            method: 'POST',
-            headers: {
-                'accept': 'application/json',
-                'authorization': `Bearer ${BEARER}`,
-                'x-csrf-token': CSRF,
-                'content-type': 'application/json',
-                'cookie': COOKIES,
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            body: JSON.stringify({ content: message, type: 'message' })
-        });
-        if (!res.ok) {
-            console.error("❌ Nepodařilo se odeslat zprávu, status:", res.status);
+        if (!BEARER || !CSRF || !COOKIES) {
+                    console.log("Zprava nebyla odeslana (chybi tokeny):", message);
+                    return;
         }
-    } catch (err) {
-        console.error("❌ Chyba při odesílání zprávy:", err.message);
-    }
+        try {
+                    const res = await fetch(`https://kick.com/api/v2/messages/send/${CHATROOM_ID}`, {
+                                    method: 'POST',
+                                    headers: {
+                                                        'accept': 'application/json',
+                                                        'authorization': `Bearer ${BEARER}`,
+                                                        'x-csrf-token': CSRF,
+                                                        'content-type': 'application/json',
+                                                        'cookie': COOKIES,
+                                                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                                    },
+                                    body: JSON.stringify({ content: message, type: 'message' })
+                    });
+                    if (!res.ok) {
+                                    console.error("Nepodarilo se odeslat zpravu, status:", res.status);
+                    }
+        } catch (err) {
+                    console.error("Chyba pri odesilani zpravy:", err.message);
+        }
 }
 
-// --- Připojení k Kick chatu přes Pusher ---
-// V Node.js verzi 8+ pusher-js funguje, ale ošetříme případné pády spojení
+// --- Pripojeni k Kick chatu pres Pusher ---
+// V Node.js verzi 8+ pusher-js funguje, ale osetrime pripadne pady spojeni
 const pusher = new Pusher(PUSHER_KEY, { 
-    cluster: PUSHER_CLUSTER, 
-    forceTLS: true
+                              cluster: PUSHER_CLUSTER, 
+        forceTLS: true
 });
 
 const channel = pusher.subscribe(`chatrooms.${CHATROOM_ID}.v2`);
 
 channel.bind('pusher:subscription_succeeded', () => {
-    console.log("✅ Bot je připojen k Kick chatu jirkazz!");
+        console.log("Bot je pripojen k Kick chatu jirkazz!");
 });
 
 channel.bind('pusher:subscription_error', (err) => {
-    console.error("❌ Chyba připojení k Pusher:", err);
+        console.error("Chyba pripojeni k Pusher:", err);
 });
 
-// --- Zpracování každé zprávy v chatu ---
+// --- Automaticke rozpoznani zapnuti a vypnuti streamu ---
+channel.bind('App\\Events\\StreamerIsLive', (data) => {
+        isStreamOnlineCache = true;
+        console.log("Kick oznamil: STREAM JE NYNI ONLINE! Rozdavani bodu povoleno.");
+});
+
+channel.bind('App\\Events\\StreamerIsOffline', (data) => {
+        isStreamOnlineCache = false;
+        console.log("Kick oznamil: STREAM JE NYNI OFFLINE! Rozdavani bodu zastaveno.");
+});
+
+// --- Zpracovani kazde zpravy v chatu ---
 channel.bind('App\\Events\\ChatMessageEvent', async (data) => {
-    try {
-        const kickId = data.sender.id;
-        const username = data.sender.username;
-        const content = data.content.trim();
+        try {
+                    const kickId = data.sender.id;
+                    const username = data.sender.username;
+                    const content = data.content.trim();
 
-        // Zaznamenáme aktivitu uživatele
-        activeUsers.set(kickId, { username, lastSeen: Date.now() });
+            // Zaznamename aktivitu uzivatele
+            activeUsers.set(kickId, { username, lastSeen: Date.now() });
 
-        console.log(`[CHAT] ${username}: ${content}`);
+            console.log(`[CHAT] ${username}: ${content}`);
 
-        // --- Příkaz !points ---
-        if (content === '!points' || content === '!body') {
-            const rows = await sql`SELECT points FROM users WHERE kick_id = ${kickId}`;
-            const points = rows[0] ? rows[0].points : null;
+            // --- Prikaz !points ---
+            if (content === '!points' || content === '!body') {
+                            const rows = await sql`SELECT points FROM users WHERE kick_id = ${kickId}`;
+                            const points = rows[0] ? rows[0].points : null;
 
-            if (points === null) {
-                await sendKickMessage(`@${username} Ještě nemáš účet na jirkazz.com! Přihlas se přes Kick na webu a body se ti začnou přičítat.`);
-            } else {
-                await sendKickMessage(`@${username} máš ${points} bodů. 💎`);
+                        if (points === null) {
+                                            await sendKickMessage(`@${username} Jeste nemas ucet na jirkazz.com! Prihlas se pres Kick na webu a body se ti zacnou pricitat.`);
+                        } else {
+                                            await sendKickMessage(`@${username} mas ${points} bodu.`);
+                        }
             }
-        }
 
-        // --- Příkaz !shop ---
-        if (content === '!shop') {
-            await sendKickMessage(`@${username} Shop se skiny najdeš na https://jirkazz.com/shop 🛒`);
+            // --- Prikaz !shop ---
+            if (content === '!shop') {
+                            await sendKickMessage(`@${username} Shop se skiny najdes na https://jirkazz.com/shop`);
+            }
+
+            // --- Admin prikazy pro zapnuti/vypnuti bodu ---
+            if (username.toLowerCase() === 'jirkazz' && content === '!zapnout') {
+                            isStreamOnlineCache = true;
+                            await sendKickMessage("Rozdavani bodu bylo ZAPNUTO! (Kazdych 5 minut dostanou aktivni divaci 5 bodu)");
+            }
+                    if (username.toLowerCase() === 'jirkazz' && content === '!vypnout') {
+                                    isStreamOnlineCache = false;
+                                    await sendKickMessage("Rozdavani bodu bylo VYPNUTO!");
+                    }
+        } catch (err) {
+                    console.error("Chyba pri zpracovani zpravy:", err.message);
         }
-    } catch (err) {
-        console.error("❌ Chyba při zpracování zprávy:", err.message);
-    }
 });
 
-// --- Zjištění, zda je stream zapnutý ---
-async function isStreamOnline() {
-    try {
-        const res = await fetch(`https://kick.com/api/v1/channels/jirkazz`, {
-            headers: {
-                'accept': 'application/json',
-                'authorization': `Bearer ${BEARER}`,
-                'x-csrf-token': CSRF,
-                'cookie': COOKIES,
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
-        if (!res.ok) return false;
-        const data = await res.json();
-        return data.livestream !== null;
-    } catch (err) {
-        console.error("❌ Chyba při kontrole streamu:", err);
-        return false;
-    }
-}
+// --- Stav streamu (zapina se prikazem) ---
+let isStreamOnlineCache = false;
 
-// --- Každých 5 minut: přičteme body aktivním divákům ---
+// --- Kazdych 5 minut: pricteme body aktivnim divakum ---
 setInterval(async () => {
-    try {
-        const online = await isStreamOnline();
-        if (!online) {
-            console.log("📺 " + new Date().toLocaleTimeString() + " - Stream je OFFLINE. Body se nerozdávají.");
-            // I když je offline, mažeme staré neaktivní uživatele
+        try {
+                    if (!isStreamOnlineCache) {
+                                    console.log(new Date().toLocaleTimeString() + " - Stream je OFFLINE. Body se nerozdavaji.");
+                                    // I kdyz je offline, mazeme stare neaktivni uzivatele
+                        const now = Date.now();
+                                    for (const [kickId, data] of activeUsers.entries()) {
+                                                        if (now - data.lastSeen > 6 * 60 * 1000) activeUsers.delete(kickId);
+                                    }
+                                    return;
+                    }
+
             const now = Date.now();
+                    const eligible = [];
+
             for (const [kickId, data] of activeUsers.entries()) {
-                if (now - data.lastSeen > 6 * 60 * 1000) activeUsers.delete(kickId);
+                            if (now - data.lastSeen < 6 * 60 * 1000) {
+                                                eligible.push({ kickId, username: data.username });
+                            } else {
+                                                activeUsers.delete(kickId);
+                            }
             }
-            return;
-        }
 
-        const now = Date.now();
-        const eligible = [];
-
-        for (const [kickId, data] of activeUsers.entries()) {
-            if (now - data.lastSeen < 6 * 60 * 1000) {
-                eligible.push({ kickId, username: data.username });
-            } else {
-                activeUsers.delete(kickId);
+            if (eligible.length === 0) {
+                            console.log(new Date().toLocaleTimeString() + " - Zadni aktivni divaci.");
+                            return;
             }
-        }
 
-        if (eligible.length === 0) {
-            console.log("⏳ " + new Date().toLocaleTimeString() + " - Žádní aktivní diváci.");
-            return;
-        }
+            console.log(`Rozdavam 5 bodu ${eligible.length} divakum...`);
+                    let updated = 0;
 
-        console.log(`⏳ Rozdávám 5 bodů ${eligible.length} divákům...`);
-        let updated = 0;
-        
-        for (const { kickId, username } of eligible) {
-            const rows = await sql`SELECT points FROM users WHERE kick_id = ${kickId}`;
-            if (rows.length > 0) {
-                const newPoints = rows[0].points + 5;
-                await sql`UPDATE users SET points = ${newPoints} WHERE kick_id = ${kickId}`;
-                updated++;
+            for (const { kickId, username } of eligible) {
+                            const rows = await sql`SELECT points FROM users WHERE kick_id = ${kickId}`;
+                            if (rows.length > 0) {
+                                                const newPoints = rows[0].points + 5;
+                                                await sql`UPDATE users SET points = ${newPoints} WHERE kick_id = ${kickId}`;
+                                                updated++;
+                            }
             }
+                    console.log(`Pricteno ${updated} uzivatelum.`);
+        } catch (err) {
+                    console.error("Kriticka chyba pri rozdavani bodu:", err.message);
         }
-        console.log(`✅ Přičteno ${updated} uživatelům.`);
-    } catch (err) {
-        console.error("❌ Kritická chyba při rozdávání bodů:", err.message);
-    }
 }, 5 * 60 * 1000);
 
 // Health check log
 setInterval(() => {
-    console.log(`💓 Status: Běží | Aktivní v mapě: ${activeUsers.size}`);
+        console.log(`Status: Bezi | Aktivni v mape: ${activeUsers.size}`);
 }, 60 * 1000);
 
-// --- Dummy HTTP Server pro Render.com (aby věděl, že bot běží) ---
+// --- Dummy HTTP Server pro Render.com (aby vedel, ze bot bezi) ---
 const http = require('http');
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Kick bot bezi a nasloucha na portu ' + PORT);
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('Kick bot bezi a nasloucha na portu ' + PORT);
 }).listen(PORT, () => {
-    console.log(`🌐 Falešný webserver běží na portu ${PORT} (pro Render health check)`);
+        console.log(`Falesny webserver bezi na portu ${PORT} (pro Render health check)`);
 });
